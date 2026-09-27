@@ -28,10 +28,8 @@ def canonicalize_url(url: str) -> str:
     if not scheme or not host:
         raise SsrfBlockedError("invalid_url")
     port = parts.port
-    if port and not ((scheme == "http" and port == 80) or (scheme == "https" and port == 443)):
-        netloc = f"{host}:{port}"
-    else:
-        netloc = host
+    default_port = (scheme == "http" and port == 80) or (scheme == "https" and port == 443)
+    netloc = host if port is None or default_port else f"{host}:{port}"
     path = parts.path or "/"
     return urlunsplit((scheme, netloc, path, parts.query, ""))
 
@@ -68,4 +66,4 @@ def _resolve(host: str) -> list[str]:
         infos = socket.getaddrinfo(host, None)
     except socket.gaierror as exc:
         raise SsrfBlockedError("blocked_ssrf") from exc
-    return list({info[4][0] for info in infos})
+    return [str(info[4][0]) for info in infos]
