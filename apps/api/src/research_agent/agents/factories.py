@@ -1,12 +1,20 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.exceptions import ModelRetry
 
 from research_agent.config import Settings
-from research_agent.schemas.agents import ReaderOutput, Report, ResearchPlan, Review, SearcherOutput
+from research_agent.schemas.agents import (
+    ReaderOutput,
+    Report,
+    ResearchPlan,
+    Review,
+    SearcherOutput,
+    SearchHit,
+)
 from research_agent.schemas.memory import CuratorOutput
+from research_agent.tools.search import SearchProvider
 
 PROMPTS = Path(__file__).parent / "prompts"
 
@@ -25,6 +33,9 @@ class PlannerDeps:
 @dataclass
 class SearcherDeps:
     allowed_urls: set[str]
+    provider: SearchProvider | None = None
+    arxiv: SearchProvider | None = None
+    hits: list[SearchHit] = field(default_factory=list)
 
 
 @dataclass
