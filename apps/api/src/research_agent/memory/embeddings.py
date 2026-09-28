@@ -58,9 +58,6 @@ def _hash_vector(text: str, dim: int) -> list[float]:
 
 
 def _fit(values: list[float], dim: int) -> list[float]:
-    if len(values) >= dim:
-        sliced = values[:dim]
-    else:
-        sliced = values + [0.0] * (dim - len(values))
+    sliced = values[:dim] if len(values) >= dim else values + [0.0] * (dim - len(values))
     norm = math.sqrt(sum(v * v for v in sliced)) or 1.0
     return [v / norm for v in sliced]
