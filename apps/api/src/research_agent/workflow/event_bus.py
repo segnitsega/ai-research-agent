@@ -28,9 +28,12 @@ PersistHook = Callable[[RunEvent], Coroutine[Any, Any, None]]
 
 class InProcessEventBus:
     def __init__(self) -> None:
-        self._channels: dict[UUID, asyncio.Queue[RunEvent | None]] = defaultdict(asyncio.Queue)
+        self._subscribers: dict[UUID, list[asyncio.Queue[RunEvent | None]]] = defaultdict(list)
         self._seq: dict[UUID, int] = defaultdict(int)
         self._persist_hooks: list[PersistHook] = []
+
+    def set_seq(self, run_id: UUID, seq: int) -> None:
+        self._seq[run_id] = max(self._seq[run_id], seq)
 
     def add_persist_hook(self, hook: PersistHook) -> None:
         self._persist_hooks.append(hook)
@@ -57,16 +60,23 @@ class InProcessEventBus:
             model.model_validate(data)
         for hook in self._persist_hooks:
             await hook(event)
-        await self._channels[run_id].put(event)
+        for queue in list(self._subscribers[run_id]):
+            await queue.put(event)
         return event
 
     async def subscribe(self, run_id: UUID) -> AsyncIterator[RunEvent]:
-        queue = self._channels[run_id]
-        while True:
-            event = await queue.get()
-            if event is None:
-                break
-            yield event
+        queue: asyncio.Queue[RunEvent | None] = asyncio.Queue()
+        self._subscribers[run_id].append(queue)
+        try:
+            while True:
+                event = await queue.get()
+                if event is None:
+                    break
+                yield event
+        finally:
+            if queue in self._subscribers[run_id]:
+                self._subscribers[run_id].remove(queue)
 
     async def close(self, run_id: UUID) -> None:
-        await self._channels[run_id].put(None)
+        for queue in list(self._subscribers[run_id]):
+            await queue.put(None)
