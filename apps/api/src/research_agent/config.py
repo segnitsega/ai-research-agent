@@ -2,14 +2,18 @@ import os
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from research_agent.schemas.budget import DEPTH_PRESETS, Budget, BudgetOverrides, Depth
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(".env", "../.env", "../../.env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     app_env: Literal["development", "staging", "production"] = "development"
     log_level: str = "INFO"
