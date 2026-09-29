@@ -3,7 +3,6 @@ import pytest
 from research_agent.tools.safety import SsrfBlockedError, assert_public_url, ip_is_blocked
 from research_agent.workflow.verify import quote_found_in_source
 
-
 pytestmark = pytest.mark.unit
 
 
