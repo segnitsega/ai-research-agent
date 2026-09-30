@@ -9,8 +9,8 @@ from research_agent.schemas.agents import (
     ReportSection,
     ResearchPlan,
     Review,
-    SearchHit,
     SearcherOutput,
+    SearchHit,
     SourceCandidate,
     SubQuestion,
 )

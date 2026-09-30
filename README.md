@@ -43,12 +43,30 @@ Library versions move fast. At the time this pack was written:
 
 **Do not pin from this README.** In Phase 0 the coding agent must install the latest stable versions, then record the exact pinned versions in `docs/VERSIONS.md`. Whenever a spec in this pack conflicts with the library's current official docs, the official docs win and the agent should note the deviation in an ADR.
 
-## Quick start (after Phase 0 is done)
+## Quick start
+
+The language model is Gemini only. Set `GOOGLE_API_KEY` or `GEMINI_API_KEY` in `.env`. Also set `API_KEY` to any private string. `make dev` forwards that `API_KEY` to the Next.js server. The browser never sees the Gemini key.
 
 ```bash
-cp .env.example .env        # add your API keys
-make setup                  # install python + node deps
-make up                     # postgres (pgvector) via docker compose
-make migrate                # apply DB migrations
-make dev                    # api on :8000, web on :3000
+cp .env.example .env
+make setup
+make up
+make migrate
+make dev
+```
+
+Open http://localhost:3000, ask a question, and watch the run. With `SEARCH_PROVIDER=fake` (the default), search returns a local Gemini overview page and Gemini still plans, reads, critiques, and writes. Set `SEARCH_PROVIDER=tavily` and `TAVILY_API_KEY` when you want live web search.
+
+Check the install:
+
+```bash
+make test
+make eval
+curl -s http://localhost:8000/healthz
+```
+
+A command-line run, from `apps/api` after Postgres is up:
+
+```bash
+uv run research-agent run "Who develops the Gemini models?" --depth quick
 ```

@@ -13,9 +13,7 @@ class SubQuestion(BaseModel):
     question: str
     rationale: str
     priority: Literal[1, 2, 3]
-    preferred_source_types: list[
-        Literal["academic", "official", "news", "industry", "community", "any"]
-    ] = ["any"]
+    preferred_source_types: list[Literal["academic", "official", "news", "industry", "community", "any"]] = ["any"]
 
 
 class ResearchPlan(BaseModel):
