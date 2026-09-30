@@ -1,0 +1,22 @@
+[
+  {"id": "q01", "question": "Who develops the Gemini models?", "smoke": true},
+  {"id": "q02", "question": "What is a vector database used for?", "smoke": true},
+  {"id": "q03", "question": "How does retrieval augmented generation work?", "smoke": true},
+  {"id": "q04", "question": "What is server sent events used for?", "smoke": true},
+  {"id": "q05", "question": "Why quote verification matters in research agents?", "smoke": true},
+  {"id": "q06", "question": "What is pgvector?", "smoke": false},
+  {"id": "q07", "question": "How do multi agent systems divide research work?", "smoke": false},
+  {"id": "q08", "question": "What is an API key and how should it be stored?", "smoke": false},
+  {"id": "q09", "question": "What does SSRF mean for web fetchers?", "smoke": false},
+  {"id": "q10", "question": "How should citations be checked in a report?", "smoke": false},
+  {"id": "q11", "question": "What is the role of a critic in a research loop?", "smoke": false},
+  {"id": "q12", "question": "How can memory help a repeat research question?", "smoke": false},
+  {"id": "q13", "question": "What is the difference between quick and deep research?", "smoke": false},
+  {"id": "q14", "question": "Why should raw web pages stay isolated from most agents?", "smoke": false},
+  {"id": "q15", "question": "What is a budget limit in an agent workflow?", "smoke": false},
+  {"id": "q16", "question": "How does a BFF proxy keep secrets off the browser?", "smoke": false},
+  {"id": "q17", "question": "What is structured output from a language model?", "smoke": false},
+  {"id": "q18", "question": "How do embeddings support semantic memory?", "smoke": false},
+  {"id": "q19", "question": "What is idempotency for creating a research run?", "smoke": false},
+  {"id": "q20", "question": "How should a cancelled research run behave?", "smoke": false}
+]
