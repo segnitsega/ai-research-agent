@@ -21,11 +21,11 @@ dev-api:
 	cd apps/api && uv run uvicorn research_agent.main:app --reload --host 0.0.0.0 --port 8000
 
 dev-web:
-	cd apps/web && pnpm dev
+	cd apps/web && API_KEY="$$(grep -E '^API_KEY=' ../../.env | head -1 | cut -d= -f2-)" API_BASE_URL="$${API_BASE_URL:-http://localhost:8000}" pnpm dev
 
 lint:
 	cd apps/api && uv run ruff check src tests && uv run ruff format --check src tests
-	cd apps/web && pnpm exec eslint . && pnpm exec prettier --check "src/**/*.{ts,tsx,css,json}"
+	cd apps/web && pnpm lint
 
 fmt:
 	cd apps/api && uv run ruff format src tests
@@ -37,7 +37,7 @@ typecheck:
 
 test:
 	cd apps/api && uv run pytest -m unit
-	cd apps/web && pnpm exec vitest run 2>/dev/null || true
+	cd apps/web && pnpm test
 
 test-int:
 	cd apps/api && uv run pytest -m integration
@@ -46,7 +46,7 @@ e2e:
 	cd apps/web && pnpm exec playwright test 2>/dev/null || true
 
 eval:
-	cd apps/api && uv run python -m evals.run_evals --smoke 2>/dev/null || true
+	cd apps/api && uv run python evals/run_evals.py --smoke
 
 types:
 	cd apps/api && uv run python scripts/export_openapi.py
