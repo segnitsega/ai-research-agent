@@ -22,12 +22,12 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://research:research@localhost:5433/research"
 
-    model_planner: str = "google-gla:gemini-2.5-flash"
-    model_searcher: str = "google-gla:gemini-2.5-flash"
-    model_reader: str = "google-gla:gemini-2.5-flash"
-    model_critic: str = "google-gla:gemini-2.5-flash"
-    model_writer: str = "google-gla:gemini-2.5-flash"
-    model_curator: str = "google-gla:gemini-2.5-flash"
+    model_planner: str = "google:gemini-2.5-flash"
+    model_searcher: str = "google:gemini-2.5-flash"
+    model_reader: str = "google:gemini-2.5-flash"
+    model_critic: str = "google:gemini-2.5-flash"
+    model_writer: str = "google:gemini-2.5-flash"
+    model_curator: str = "google:gemini-2.5-flash"
 
     google_api_key: SecretStr | None = None
     gemini_api_key: SecretStr | None = None

@@ -41,6 +41,6 @@ async def test_public_config_uses_gemini() -> None:
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/v1/config", headers={"X-API-Key": "test-key"})
     models = response.json()["models"]
-    assert models["planner"].startswith("google-gla:")
+    assert models["planner"].startswith("google:")
     assert "openai" not in models["planner"]
     assert "test-key" not in response.text
