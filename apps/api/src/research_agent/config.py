@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     api_key: SecretStr = SecretStr("change-me-dev-key")
     cors_origins: str = "http://localhost:3000"
 
-    database_url: str = "postgresql+asyncpg://research:research@localhost:5432/research"
+    database_url: str = "postgresql+asyncpg://research:research@localhost:5433/research"
 
     model_planner: str = "google-gla:gemini-2.5-flash"
     model_searcher: str = "google-gla:gemini-2.5-flash"
