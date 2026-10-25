@@ -1,7 +1,8 @@
 import { apiFetch } from "@/lib/env";
 
-export async function GET() {
-  const response = await apiFetch("/v1/memories");
+export async function GET(request: Request) {
+  const params = new URL(request.url).searchParams.toString();
+  const response = await apiFetch(`/v1/memories${params ? `?${params}` : ""}`);
   return new Response(await response.text(), { status: response.status, headers: { "Content-Type": "application/json" } });
 }
 

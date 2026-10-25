@@ -1,8 +1,172 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
+:root {
+  --paper: #f4efe4;
+  --raised: #fbf7ef;
+  --ink: #1c1915;
+  --muted: #6b6256;
+  --line: #e3d8c6;
+  --accent: #1c6b56;
+  --accent-ink: #f7fbf8;
+  --accent-soft: #e5f3ec;
+  --copper: #9a5430;
+  --copper-soft: #f6e7db;
+  --danger: #8d2f2f;
+  --danger-soft: #f8e6e4;
+  --warn: #8a5a12;
+  --warn-soft: #f8efd8;
+  --ok: #1d6b45;
+  --shadow: 0 24px 60px rgba(70, 48, 18, 0.08);
+  --sidebar: 15.5rem;
+  color-scheme: light;
+}
+
+html.dark {
+  --paper: #12110e;
+  --raised: #1c1a16;
+  --ink: #f4efe4;
+  --muted: #b7ad9e;
+  --line: #322d26;
+  --accent: #8ed4bf;
+  --accent-ink: #10211b;
+  --accent-soft: #1a2c26;
+  --copper: #e0a27a;
+  --copper-soft: #2c211b;
+  --danger: #f0a3a0;
+  --danger-soft: #2c1b1b;
+  --warn: #e6c27a;
+  --warn-soft: #2c2618;
+  --ok: #8ed4bf;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-raised: var(--raised);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-copper: var(--copper);
+  --color-copper-soft: var(--copper-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-ok: var(--ok);
+  --font-sans: var(--font-outfit), "Avenir Next", "Segoe UI", sans-serif;
+  --font-display: var(--font-fraunces), "Iowan Old Style", Palatino, Georgia, serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
 
 body {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  background:
+    radial-gradient(900px 420px at 0% -10%, color-mix(in oklab, var(--accent) 16%, transparent), transparent 60%),
+    radial-gradient(700px 380px at 100% 0%, color-mix(in oklab, var(--copper) 14%, transparent), transparent 55%),
+    var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--accent) 30%, var(--raised));
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.sheet {
+  background: color-mix(in oklab, var(--raised) 92%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 1.4rem;
+  box-shadow: var(--shadow);
+}
+
+.kicker {
+  color: var(--copper);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.citation {
+  display: inline-flex;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  align-items: center;
+  justify-content: center;
+  margin-inline: 0.12rem;
+  border-radius: 999px;
+  background: var(--copper-soft);
+  color: var(--copper);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: super;
+}
+
+.event-in {
+  animation: rise 0.35s ease;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .event-in {
+    animation: none;
+  }
+}
+
+.meter {
+  height: 0.4rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.meter[data-tone="warn"] > span {
+  background: var(--warn);
+}
+
+.meter[data-tone="danger"] > span {
+  background: var(--danger);
+}
+
+html.dark .show-in-light,
+html:not(.dark) .show-in-dark {
+  display: none;
 }
