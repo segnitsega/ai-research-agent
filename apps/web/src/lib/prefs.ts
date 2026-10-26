@@ -16,24 +16,40 @@ export const defaultPrefs: DeskPrefs = {
 const KEY = "folio-prefs";
 const EVENT = "folio-prefs";
 
+let snapshot: DeskPrefs = defaultPrefs;
+
+function samePrefs(left: DeskPrefs, right: DeskPrefs): boolean {
+  return left.theme === right.theme && left.depth === right.depth && left.useMemory === right.useMemory;
+}
+
+/** Stable snapshot for useSyncExternalStore — must return the same object when values are unchanged. */
 export function readPrefs(): DeskPrefs {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return defaultPrefs;
+    if (!raw) {
+      snapshot = defaultPrefs;
+      return snapshot;
+    }
     const parsed = JSON.parse(raw) as Partial<DeskPrefs>;
-    return {
+    const next: DeskPrefs = {
       theme: parsed.theme === "light" || parsed.theme === "dark" || parsed.theme === "system" ? parsed.theme : "system",
       depth: parsed.depth === "quick" || parsed.depth === "standard" || parsed.depth === "deep" ? parsed.depth : "standard",
       useMemory: typeof parsed.useMemory === "boolean" ? parsed.useMemory : true,
     };
+    if (!samePrefs(snapshot, next)) snapshot = next;
+    return snapshot;
   } catch {
-    return defaultPrefs;
+    snapshot = defaultPrefs;
+    return snapshot;
   }
 }
 
 export function writePrefs(next: DeskPrefs) {
-  localStorage.setItem(KEY, JSON.stringify(next));
-  applyTheme(next.theme);
+  if (!samePrefs(snapshot, next)) {
+    snapshot = { theme: next.theme, depth: next.depth, useMemory: next.useMemory };
+  }
+  localStorage.setItem(KEY, JSON.stringify(snapshot));
+  applyTheme(snapshot.theme);
   window.dispatchEvent(new Event(EVENT));
 }
 

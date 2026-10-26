@@ -16,7 +16,15 @@ class Idle:
 
 
 def _app() -> object:
-    settings = Settings(api_key="test-key")  # type: ignore[arg-type]
+    settings = Settings(
+        api_key="test-key",  # type: ignore[arg-type]
+        model_planner="xai:grok-4.7",
+        model_searcher="xai:grok-4.7",
+        model_reader="xai:grok-4.7",
+        model_critic="xai:grok-4.7",
+        model_writer="xai:grok-4.7",
+        model_curator="xai:grok-4.7",
+    )
     return create_app(
         settings=settings,
         store=InMemoryResearchStore(),
@@ -36,11 +44,10 @@ async def test_healthz() -> None:
 
 
 @pytest.mark.asyncio
-async def test_public_config_uses_gemini() -> None:
+async def test_public_config_uses_configured_models() -> None:
     transport = ASGITransport(app=_app())
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/v1/config", headers={"X-API-Key": "test-key"})
     models = response.json()["models"]
-    assert models["planner"].startswith("google:")
-    assert "openai" not in models["planner"]
+    assert models["planner"].startswith("xai:")
     assert "test-key" not in response.text

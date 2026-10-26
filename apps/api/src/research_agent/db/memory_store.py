@@ -151,8 +151,12 @@ class InMemoryResearchStore:
             return None
         return max(matches, key=lambda source: source.fetched_at)
 
-    async def save_source(self, source: SourceRecord) -> None:
+    async def save_source(self, source: SourceRecord) -> UUID:
+        for existing in self.sources.values():
+            if existing.canonical_url == source.canonical_url and existing.content_hash == source.content_hash:
+                return existing.id
         self.sources[source.id] = source
+        return source.id
 
     async def link_source(self, run_id: UUID, source_id: UUID, sub_question_id: str) -> None:
         key = (run_id, source_id, sub_question_id)

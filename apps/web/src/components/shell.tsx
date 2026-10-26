@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { cn } from "@/lib/format";
-import { applyTheme, readPrefs } from "@/lib/prefs";
+import { applyTheme, readPrefs, writePrefs } from "@/lib/prefs";
 
 const LINKS = [
   { href: "/", label: "Desk", hint: "New question" },
@@ -113,10 +113,7 @@ export function ThemeButton() {
       className="min-h-11 rounded-full border border-line bg-raised px-4 text-sm font-semibold"
       onClick={() => {
         const next = document.documentElement.classList.contains("dark") ? "light" : "dark";
-        const current = readPrefs();
-        localStorage.setItem("folio-prefs", JSON.stringify({ ...current, theme: next }));
-        applyTheme(next);
-        window.dispatchEvent(new Event("folio-prefs"));
+        writePrefs({ ...readPrefs(), theme: next });
       }}
     >
       <span className="show-in-dark">Light</span>

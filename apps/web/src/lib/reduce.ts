@@ -369,7 +369,7 @@ export function eventSummary(event: RunEvent): string {
     case "run.completed":
       return "Run completed";
     case "run.failed":
-      return text(data.message) || "Run failed";
+      return "The research run failed.";
     case "run.cancelled":
       return "Run cancelled";
     default:
@@ -489,7 +489,8 @@ export function reduce(state: RunState, event: RunEvent): RunState {
   if (event.type === "run.completed") next.status = "completed";
   if (event.type === "run.failed") {
     next.status = "failed";
-    next.error = text(data.message) || "Run failed";
+    next.error = "The research run failed.";
+    next.events = [...state.events, { ...event, data: {} }];
   }
   if (event.type === "run.cancelled") next.status = "cancelled";
   return next;
@@ -521,6 +522,6 @@ export function mergeDetail(state: RunState, detail: RunDetailSeed): RunState {
     report: state.report ?? parseReport(detail.report),
     usage: state.usage ?? parseUsage(detail.usage),
     budget: state.budget ?? parseBudget(detail.budget),
-    error: state.error ?? detail.error ?? null,
+    error: state.error ?? (detail.error ? "The research run failed." : null),
   };
 }

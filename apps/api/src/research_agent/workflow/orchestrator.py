@@ -1,7 +1,8 @@
 import asyncio
 import hashlib
+import logging
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
@@ -30,6 +31,8 @@ from research_agent.workflow.event_bus import InProcessEventBus
 from research_agent.workflow.registry import RunRegistry
 from research_agent.workflow.state import mark_phase_done
 from research_agent.workflow.verify import quote_found_in_source, validate_report_citations
+
+logger = logging.getLogger(__name__)
 
 FIXTURE_PAGES: dict[str, str] = {
     "https://research.example/gemini": (
@@ -131,7 +134,8 @@ class RunOrchestrator:
                 "run.cancelled",
                 {"type": "run.cancelled", "phase": record.phase or Phase.PLAN.value},
             )
-        except Exception as exc:
+        except Exception:
+            logger.exception("research run failed")
             await self.store.update_run(  # type: ignore[attr-defined]
                 user_id,
                 run_id,
@@ -144,7 +148,7 @@ class RunOrchestrator:
                 user_id,
                 run_id,
                 "run.failed",
-                {"type": "run.failed", "error_code": "run_failed", "message": _safe_message(exc)},
+                {"type": "run.failed", "error_code": "run_failed", "message": "The research run failed."},
             )
         finally:
             await self.bus.close(run_id)
@@ -250,22 +254,26 @@ class RunOrchestrator:
             try:
                 await self._search_and_read(user_id, record, tracker, focus)
             except BudgetExhaustedError as exc:
-                limitations.append(f"Stopped because the {exc.resource} budget was exhausted.")
-                await self._emit(
-                    user_id,
-                    record.id,
-                    "budget.exhausted",
-                    {"type": "budget.exhausted", "resource": exc.resource, "action": "proceeding_to_write"},
-                )
-                break
+                await self._note_budget_exhausted(user_id, record.id, limitations, exc.resource)
+            except ExceptionGroup as group:
+                budget_errors = [exc for exc in group.exceptions if isinstance(exc, BudgetExhaustedError)]
+                if not budget_errors:
+                    raise
+                await self._note_budget_exhausted(user_id, record.id, limitations, budget_errors[0].resource)
+            if tracker.exhausted is not None and "budget was exhausted" not in " ".join(limitations):
+                await self._note_budget_exhausted(user_id, record.id, limitations, tracker.exhausted)
             findings = await self._views(user_id, record)
-            tracker.check_llm_allowed()
-            review, usage = await self.agents.critique(record.question, plan, findings)
-            _charge(tracker, AgentName.CRITIC, usage)
+            try:
+                tracker.check_llm_allowed()
+                review, usage = await self.agents.critique(record.question, plan, findings)
+                _charge(tracker, AgentName.CRITIC, usage)
+            except BudgetExhaustedError as exc:
+                await self._note_budget_exhausted(user_id, record.id, limitations, exc.resource)
+                break
             record.state.last_review = review
             record.state.pending_gaps = list(review.gaps)
             await self._emit(user_id, record.id, "critic.review", {"type": "critic.review", "review": review.model_dump(mode="json")})
-            decision = "write" if review.verdict == "sufficient" or not tracker.check_iteration_allowed() else "continue"
+            decision = "write" if review.verdict == "sufficient" or tracker.exhausted is not None or not tracker.check_iteration_allowed() else "continue"
             await self._emit(
                 user_id,
                 record.id,
@@ -279,7 +287,7 @@ class RunOrchestrator:
             )
             await self.store.update_run(user_id, record.id, state=record.state, usage=tracker.usage_snapshot())  # type: ignore[attr-defined]
             if decision == "write":
-                if review.verdict != "sufficient":
+                if review.verdict != "sufficient" and tracker.exhausted is None:
                     limitations.append("Stopped at the iteration limit before the critic called the evidence sufficient.")
                 break
 
@@ -315,7 +323,10 @@ class RunOrchestrator:
             "search.started",
             {"type": "search.started", "sub_question_id": sub_question_id, "query": queries[0]},
         )
-        tracker.check_llm_allowed()
+        try:
+            tracker.check_llm_allowed()
+        except BudgetExhaustedError:
+            return
         searched, usage = await self.agents.search(question, sub_question_id, queries)
         _charge(tracker, AgentName.SEARCHER, usage)
         for candidate in searched.candidates:
@@ -334,7 +345,10 @@ class RunOrchestrator:
         question: str,
     ) -> None:
         self._raise_if_cancelled(record.id)
-        tracker.check_fetch_allowed()
+        try:
+            tracker.check_fetch_allowed()
+        except BudgetExhaustedError:
+            return
         try:
             fetched = await self._fetch(url)
         except FetchFailed as exc:
@@ -346,114 +360,142 @@ class RunOrchestrator:
             )
             return
         tracker.record_fetch()
-        extracted = extract_document(fetched.body, fetched.content_type)
-        digest = hashlib.sha256(extracted.text.encode()).hexdigest()
-        source_id = uuid4()
-        domain = urlsplit(fetched.final_url).hostname or "research.example"
-        source = SourceRecord(
-            id=source_id,
-            canonical_url=fetched.final_url,
-            content_hash=digest,
-            title=extracted.title or title,
-            domain=domain,
-            text=extracted.text,
-            published_at=extracted.published_at,
-            fetched_at=datetime.now(UTC),
-            content_type=fetched.content_type,
-            sub_question_id=sub_question_id,
-            status="fetched",
-            error=None,
-            from_cache=fetched.from_cache,
-        )
-        await self.store.save_source(source)  # type: ignore[attr-defined]
-        await self.store.link_source(record.id, source.id, sub_question_id)  # type: ignore[attr-defined]
-        if self.embedder is not None:
-            chunks = chunk_text(extracted.text)
-            vectors = await self.embedder.embed(chunks) if chunks else []  # type: ignore[attr-defined]
-            await self.store.save_chunks(source.id, list(enumerate_chunks(chunks, vectors)))  # type: ignore[attr-defined]
-        await self._emit(
-            user_id,
-            record.id,
-            "source.found",
-            {
-                "type": "source.found",
-                "source_id": str(source.id),
-                "url": url,
-                "title": source.title or title,
-                "domain": domain,
-                "sub_question_id": sub_question_id,
-                "reason": reason,
-                "expected_quality": quality,
-            },
-        )
-        await self._emit(
-            user_id,
-            record.id,
-            "source.fetched",
-            {
-                "type": "source.fetched",
-                "source_id": str(source.id),
-                "url": fetched.final_url,
-                "chars": len(extracted.text),
-                "from_cache": fetched.from_cache,
-                "fetched_at": source.fetched_at.isoformat(),
-            },
-        )
-        tracker.check_llm_allowed()
-        drafted, usage = await self.agents.read(extracted.text, sub_question_id, question)
-        _charge(tracker, AgentName.READER, usage)
-        for draft in drafted.findings:
-            accepted = quote_found_in_source(
-                draft.evidence_quote,
-                extracted.text,
-                fuzzy=self.settings.quote_fuzzy_match,
-                fuzzy_threshold=self.settings.quote_fuzzy_threshold,
+        try:
+            extracted = extract_document(fetched.body, fetched.content_type)
+            digest = hashlib.sha256(extracted.text.encode()).hexdigest()
+            domain = urlsplit(fetched.final_url).hostname or "research.example"
+            source = SourceRecord(
+                id=uuid4(),
+                canonical_url=fetched.final_url,
+                content_hash=digest,
+                title=extracted.title or title,
+                domain=domain,
+                text=extracted.text,
+                published_at=extracted.published_at,
+                fetched_at=datetime.now(UTC),
+                content_type=fetched.content_type,
+                sub_question_id=sub_question_id,
+                status="fetched",
+                error=None,
+                from_cache=fetched.from_cache,
             )
-            finding = Finding(
-                id=str(uuid4()),
-                run_id=str(record.id),
-                source_id=str(source.id),
-                sub_question_id=draft.sub_question_id or sub_question_id,
-                claim=draft.claim,
-                evidence_quote=draft.evidence_quote,
-                confidence=draft.confidence,
-                stance=draft.stance,
-                status=FindingStatus.ACCEPTED if accepted else FindingStatus.REJECTED,
-                reject_reason=None if accepted else "quote_not_in_source",
-            )
-            vector = None
+            stored_id = await self.store.save_source(source)  # type: ignore[attr-defined]
+            source = replace(source, id=stored_id)
+            await self.store.link_source(record.id, source.id, sub_question_id)  # type: ignore[attr-defined]
             if self.embedder is not None:
-                vector = (await self.embedder.embed([draft.claim]))[0]  # type: ignore[attr-defined]
-            await self.store.add_finding(StoredFinding(finding=finding, user_id=user_id, embedding=vector))  # type: ignore[attr-defined]
-            if accepted:
-                await self._emit(
-                    user_id,
-                    record.id,
-                    "finding.extracted",
-                    {
-                        "type": "finding.extracted",
-                        "finding_id": finding.id,
-                        "source_id": finding.source_id,
-                        "sub_question_id": finding.sub_question_id,
-                        "claim": finding.claim,
-                        "evidence_quote": finding.evidence_quote,
-                        "confidence": finding.confidence,
-                        "stance": finding.stance,
-                    },
+                chunks = chunk_text(extracted.text)
+                vectors = await self.embedder.embed(chunks) if chunks else []  # type: ignore[attr-defined]
+                await self.store.save_chunks(source.id, list(enumerate_chunks(chunks, vectors)))  # type: ignore[attr-defined]
+            await self._emit(
+                user_id,
+                record.id,
+                "source.found",
+                {
+                    "type": "source.found",
+                    "source_id": str(source.id),
+                    "url": url,
+                    "title": source.title or title,
+                    "domain": domain,
+                    "sub_question_id": sub_question_id,
+                    "reason": reason,
+                    "expected_quality": quality,
+                },
+            )
+            await self._emit(
+                user_id,
+                record.id,
+                "source.fetched",
+                {
+                    "type": "source.fetched",
+                    "source_id": str(source.id),
+                    "url": fetched.final_url,
+                    "chars": len(extracted.text),
+                    "from_cache": fetched.from_cache,
+                    "fetched_at": source.fetched_at.isoformat(),
+                },
+            )
+            tracker.check_llm_allowed()
+            drafted, usage = await self.agents.read(extracted.text, sub_question_id, question)
+            _charge(tracker, AgentName.READER, usage)
+            for draft in drafted.findings:
+                accepted = quote_found_in_source(
+                    draft.evidence_quote,
+                    extracted.text,
+                    fuzzy=self.settings.quote_fuzzy_match,
+                    fuzzy_threshold=self.settings.quote_fuzzy_threshold,
                 )
-            else:
-                await self._emit(
-                    user_id,
-                    record.id,
-                    "finding.rejected",
-                    {
-                        "type": "finding.rejected",
-                        "source_id": finding.source_id,
-                        "sub_question_id": finding.sub_question_id,
-                        "claim": finding.claim,
-                        "reason": "quote_not_in_source",
-                    },
+                finding = Finding(
+                    id=str(uuid4()),
+                    run_id=str(record.id),
+                    source_id=str(source.id),
+                    sub_question_id=draft.sub_question_id or sub_question_id,
+                    claim=draft.claim,
+                    evidence_quote=draft.evidence_quote,
+                    confidence=draft.confidence,
+                    stance=draft.stance,
+                    status=FindingStatus.ACCEPTED if accepted else FindingStatus.REJECTED,
+                    reject_reason=None if accepted else "quote_not_in_source",
                 )
+                vector = None
+                if self.embedder is not None:
+                    vector = (await self.embedder.embed([draft.claim]))[0]  # type: ignore[attr-defined]
+                await self.store.add_finding(StoredFinding(finding=finding, user_id=user_id, embedding=vector))  # type: ignore[attr-defined]
+                if accepted:
+                    await self._emit(
+                        user_id,
+                        record.id,
+                        "finding.extracted",
+                        {
+                            "type": "finding.extracted",
+                            "finding_id": finding.id,
+                            "source_id": finding.source_id,
+                            "sub_question_id": finding.sub_question_id,
+                            "claim": finding.claim,
+                            "evidence_quote": finding.evidence_quote,
+                            "confidence": finding.confidence,
+                            "stance": finding.stance,
+                        },
+                    )
+                else:
+                    await self._emit(
+                        user_id,
+                        record.id,
+                        "finding.rejected",
+                        {
+                            "type": "finding.rejected",
+                            "source_id": finding.source_id,
+                            "sub_question_id": finding.sub_question_id,
+                            "claim": finding.claim,
+                            "reason": "quote_not_in_source",
+                        },
+                    )
+        except BudgetExhaustedError:
+            return
+        except Exception:
+            logger.exception("failed while reading source %s", url)
+            await self._emit(
+                user_id,
+                record.id,
+                "source.failed",
+                {"type": "source.failed", "source_id": None, "url": url, "reason": "http_error"},
+            )
+
+    async def _note_budget_exhausted(
+        self,
+        user_id: UUID,
+        run_id: UUID,
+        limitations: list[str],
+        resource: str,
+    ) -> None:
+        note = f"Stopped because the {resource} budget was exhausted."
+        if note not in limitations:
+            limitations.append(note)
+        await self._emit(
+            user_id,
+            run_id,
+            "budget.exhausted",
+            {"type": "budget.exhausted", "resource": resource, "action": "proceeding_to_write"},
+        )
 
     async def _write(
         self,
@@ -630,13 +672,6 @@ def _fallback_report(findings: list[FindingView], limitations: list[str], source
         limitations=limitations,
         citations=[Citation(n=1, source_id=source_id, finding_ids=[item.id for item in findings])],
     )
-
-
-def _safe_message(exc: Exception) -> str:
-    text = str(exc)
-    if any(token in text.lower() for token in ("key", "token", "secret", "password")):
-        return "The research run failed."
-    return text[:300] or "The research run failed."
 
 
 def enumerate_chunks(chunks: list[str], vectors: list[list[float]]) -> list[tuple[int, str, list[float]]]:

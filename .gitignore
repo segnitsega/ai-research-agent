@@ -29,3 +29,4 @@ apps/api/.venv/
 apps/web/.env.local
 .commit-counter
 .commit-helper.sh
+notes/

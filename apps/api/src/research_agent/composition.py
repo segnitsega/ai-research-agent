@@ -5,7 +5,7 @@ from research_agent.db.sql_store import SqlResearchStore
 from research_agent.memory.embeddings import build_embedder
 from research_agent.schemas.agents import SearchHit
 from research_agent.tools.fetch import GuardedFetcher
-from research_agent.tools.search import ArxivProvider, FakeSearchProvider, TavilyProvider
+from research_agent.tools.search import ArxivProvider, DuckDuckGoProvider, FakeSearchProvider, TavilyProvider
 from research_agent.workflow.event_bus import InProcessEventBus
 from research_agent.workflow.orchestrator import FIXTURE_PAGES, RunOrchestrator, ports_from_gemini
 from research_agent.workflow.registry import RunRegistry
@@ -28,11 +28,13 @@ class FixtureSearch:
         ][:limit]
 
 
-def build_search(settings: Settings) -> FakeSearchProvider | TavilyProvider | FixtureSearch:
+def build_search(settings: Settings) -> FakeSearchProvider | TavilyProvider | DuckDuckGoProvider | FixtureSearch:
     if settings.search_provider == "tavily" and settings.tavily_api_key is not None:
         secret = settings.tavily_api_key.get_secret_value()
         if secret:
             return TavilyProvider(secret)
+    if settings.search_provider == "duckduckgo":
+        return DuckDuckGoProvider()
     if settings.search_provider == "fake":
         return FixtureSearch()
     return FixtureSearch()

@@ -35,6 +35,17 @@ describe("reduce", () => {
     expect(state.phase).toBe("read");
   });
 
+  it("does not surface a provider error body", () => {
+    const state = reduce(emptyRunState(), {
+      seq: 1,
+      type: "run.failed",
+      data: { message: "status_code: 404, model_name: gemini-2.5-flash, body: {'error': {'code': 404}}" },
+    });
+    expect(state.error).toBe("The research run failed.");
+    expect(eventSummary(state.events[0])).toBe("The research run failed.");
+    expect(JSON.stringify(state)).not.toContain("gemini-2.5-flash");
+  });
+
   it("describes a search in one line", () => {
     expect(eventSummary({ seq: 4, type: "search.started", data: { query: "gemini developer" } })).toBe("Searching “gemini developer”");
   });

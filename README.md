@@ -4,7 +4,7 @@ Multi-agent research app. Gemini plans, searches, reads, critiques, and writes a
 
 ## Run
 
-Set `GOOGLE_API_KEY` or `GEMINI_API_KEY`, and an `API_KEY`, in `.env`.
+Set `XAI_API_KEY` (for Grok), and an `API_KEY`, in `.env`. Gemini keys are optional if you switch models back to `google:…`.
 
 ```bash
 cp .env.example .env
@@ -16,7 +16,7 @@ make dev
 
 Open http://localhost:3000. The API is on http://localhost:8000.
 
-`SEARCH_PROVIDER=fake` uses a local sample page so the first run only needs the Gemini key. Set `SEARCH_PROVIDER=tavily` and `TAVILY_API_KEY` for live web search.
+`SEARCH_PROVIDER=duckduckgo` uses live DuckDuckGo results with no search API key. Use `fake` for a local sample page (Gemini key only), or `tavily` with `TAVILY_API_KEY` for Tavily.
 
 ## Check
 

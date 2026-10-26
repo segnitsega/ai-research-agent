@@ -184,7 +184,7 @@ class SqlResearchStore:
             row = await session.scalar(select(SourceRow).where(SourceRow.canonical_url == canonical_url).order_by(SourceRow.fetched_at.desc()))
             return None if row is None else _source(row, "", "fetched", None, True)
 
-    async def save_source(self, source: SourceRecord) -> None:
+    async def save_source(self, source: SourceRecord) -> UUID:
         async with self._sessions() as session:
             existing = await session.scalar(
                 select(SourceRow).where(
@@ -192,21 +192,35 @@ class SqlResearchStore:
                     SourceRow.content_hash == source.content_hash,
                 )
             )
-            if existing is None:
-                session.add(
-                    SourceRow(
-                        id=source.id,
-                        canonical_url=source.canonical_url,
-                        content_hash=source.content_hash,
-                        title=source.title,
-                        domain=source.domain,
-                        text=source.text,
-                        published_at=source.published_at,
-                        fetched_at=source.fetched_at,
-                        content_type=source.content_type,
+            if existing is not None:
+                return existing.id
+            session.add(
+                SourceRow(
+                    id=source.id,
+                    canonical_url=source.canonical_url,
+                    content_hash=source.content_hash,
+                    title=source.title,
+                    domain=source.domain,
+                    text=source.text,
+                    published_at=source.published_at,
+                    fetched_at=source.fetched_at,
+                    content_type=source.content_type,
+                )
+            )
+            try:
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raced = await session.scalar(
+                    select(SourceRow).where(
+                        SourceRow.canonical_url == source.canonical_url,
+                        SourceRow.content_hash == source.content_hash,
                     )
                 )
-            await session.commit()
+                if raced is not None:
+                    return raced.id
+                raise
+            return source.id
 
     async def link_source(self, run_id: UUID, source_id: UUID, sub_question_id: str) -> None:
         async with self._sessions() as session:
@@ -408,6 +422,14 @@ class SqlResearchStore:
     async def save_chunks(self, source_id: UUID, chunks: list[tuple[int, str, list[float]]]) -> None:
         async with self._sessions() as session:
             for index, text, embedding in chunks:
+                existing = await session.scalar(
+                    select(SourceChunkRow).where(
+                        SourceChunkRow.source_id == source_id,
+                        SourceChunkRow.chunk_index == index,
+                    )
+                )
+                if existing is not None:
+                    continue
                 session.add(
                     SourceChunkRow(
                         id=uuid4(),

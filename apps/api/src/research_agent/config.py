@@ -22,21 +22,22 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://research:research@localhost:5433/research"
 
-    model_planner: str = "google:gemini-2.5-flash"
-    model_searcher: str = "google:gemini-2.5-flash"
-    model_reader: str = "google:gemini-2.5-flash"
-    model_critic: str = "google:gemini-2.5-flash"
-    model_writer: str = "google:gemini-2.5-flash"
-    model_curator: str = "google:gemini-2.5-flash"
+    model_planner: str = "xai:grok-4.7"
+    model_searcher: str = "xai:grok-4.7"
+    model_reader: str = "xai:grok-4.7"
+    model_critic: str = "xai:grok-4.7"
+    model_writer: str = "xai:grok-4.7"
+    model_curator: str = "xai:grok-4.7"
 
     google_api_key: SecretStr | None = None
     gemini_api_key: SecretStr | None = None
+    xai_api_key: SecretStr | None = None
 
     embedder: Literal["hash", "gemini"] = "hash"
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_dim: int = 384
 
-    search_provider: Literal["fake", "tavily", "arxiv"] = "fake"
+    search_provider: Literal["fake", "tavily", "duckduckgo", "arxiv"] = "fake"
     tavily_api_key: SecretStr | None = None
     brave_api_key: SecretStr | None = None
 
@@ -139,12 +140,20 @@ class Settings(BaseSettings):
         if key:
             os.environ["GOOGLE_API_KEY"] = key
             os.environ["GEMINI_API_KEY"] = key
+        xai = self.resolved_xai_api_key()
+        if xai:
+            os.environ["XAI_API_KEY"] = xai
 
     def resolved_google_api_key(self) -> str | None:
         if self.google_api_key is not None and self.google_api_key.get_secret_value():
             return self.google_api_key.get_secret_value()
         if self.gemini_api_key is not None and self.gemini_api_key.get_secret_value():
             return self.gemini_api_key.get_secret_value()
+        return None
+
+    def resolved_xai_api_key(self) -> str | None:
+        if self.xai_api_key is not None and self.xai_api_key.get_secret_value():
+            return self.xai_api_key.get_secret_value()
         return None
 
     def public_config(self) -> dict[str, object]:
