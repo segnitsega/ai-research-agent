@@ -1,5 +1,6 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
+from pydantic import SecretStr
 
 from research_agent.config import Settings
 from research_agent.db.memory_store import InMemoryResearchStore
@@ -17,7 +18,11 @@ class Idle:
 
 def _app() -> object:
     settings = Settings(
-        api_key="test-key",  # type: ignore[arg-type]
+        _env_file=None,
+        api_key=SecretStr("test-key"),
+        google_api_key=SecretStr(""),
+        gemini_api_key=SecretStr(""),
+        xai_api_key=SecretStr("xai-test"),
         model_planner="xai:grok-4.7",
         model_searcher="xai:grok-4.7",
         model_reader="xai:grok-4.7",

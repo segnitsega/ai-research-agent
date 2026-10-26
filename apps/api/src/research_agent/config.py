@@ -7,6 +7,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from research_agent.schemas.budget import DEPTH_PRESETS, Budget, BudgetOverrides, Depth
 
+DEFAULT_GEMINI_MODEL = "google:gemini-2.5-flash"
+DEFAULT_XAI_MODEL = "xai:grok-4.7"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -22,12 +25,12 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://research:research@localhost:5433/research"
 
-    model_planner: str = "xai:grok-4.7"
-    model_searcher: str = "xai:grok-4.7"
-    model_reader: str = "xai:grok-4.7"
-    model_critic: str = "xai:grok-4.7"
-    model_writer: str = "xai:grok-4.7"
-    model_curator: str = "xai:grok-4.7"
+    model_planner: str = DEFAULT_GEMINI_MODEL
+    model_searcher: str = DEFAULT_GEMINI_MODEL
+    model_reader: str = DEFAULT_GEMINI_MODEL
+    model_critic: str = DEFAULT_GEMINI_MODEL
+    model_writer: str = DEFAULT_GEMINI_MODEL
+    model_curator: str = DEFAULT_GEMINI_MODEL
 
     google_api_key: SecretStr | None = None
     gemini_api_key: SecretStr | None = None
@@ -143,6 +146,8 @@ class Settings(BaseSettings):
         xai = self.resolved_xai_api_key()
         if xai:
             os.environ["XAI_API_KEY"] = xai
+        if self.allow_model_requests:
+            os.environ["ALLOW_MODEL_REQUESTS"] = "true"
 
     def resolved_google_api_key(self) -> str | None:
         if self.google_api_key is not None and self.google_api_key.get_secret_value():
@@ -156,6 +161,42 @@ class Settings(BaseSettings):
             return self.xai_api_key.get_secret_value()
         return None
 
+    def resolve_llm_model(self, configured: str):
+        """Pick Gemini first when its key exists, otherwise Grok; fall back across both when possible."""
+        from pydantic_ai.models.fallback import FallbackModel
+
+        has_google = bool(self.resolved_google_api_key())
+        has_xai = bool(self.resolved_xai_api_key())
+        gemini = configured if _is_google_model(configured) else DEFAULT_GEMINI_MODEL
+        grok = configured if _is_xai_model(configured) else DEFAULT_XAI_MODEL
+
+        if has_google and has_xai:
+            return FallbackModel(gemini, grok)
+        if has_google:
+            return gemini
+        if has_xai:
+            return grok
+        return configured
+
+    def describe_llm_model(self, configured: str) -> str:
+        model = self.resolve_llm_model(configured)
+        nested = getattr(model, "models", None)
+        if nested:
+            parts: list[str] = []
+            for item in nested:
+                name = getattr(item, "model_name", str(item))
+                kind = type(item).__name__.lower()
+                if "google" in kind:
+                    parts.append(f"google:{name}")
+                elif "xai" in kind:
+                    parts.append(f"xai:{name}")
+                else:
+                    parts.append(str(name))
+            return " → ".join(parts)
+        if isinstance(model, str):
+            return model
+        return str(getattr(model, "model_name", model))
+
     def public_config(self) -> dict[str, object]:
         return {
             "depth_presets": {k.value: v for k, v in DEPTH_PRESETS.items()},
@@ -168,14 +209,23 @@ class Settings(BaseSettings):
             },
             "search_providers": [self.search_provider, "arxiv"],
             "models": {
-                "planner": self.model_planner,
-                "searcher": self.model_searcher,
-                "reader": self.model_reader,
-                "critic": self.model_critic,
-                "writer": self.model_writer,
-                "curator": self.model_curator,
+                "planner": self.describe_llm_model(self.model_planner),
+                "searcher": self.describe_llm_model(self.model_searcher),
+                "reader": self.describe_llm_model(self.model_reader),
+                "critic": self.describe_llm_model(self.model_critic),
+                "writer": self.describe_llm_model(self.model_writer),
+                "curator": self.describe_llm_model(self.model_curator),
             },
         }
+
+
+def _is_google_model(model: str) -> bool:
+    prefix = model.split(":", 1)[0].lower()
+    return prefix in {"google", "google-gla", "google-vertex", "gemini"}
+
+
+def _is_xai_model(model: str) -> bool:
+    return model.split(":", 1)[0].lower() == "xai"
 
 
 @lru_cache

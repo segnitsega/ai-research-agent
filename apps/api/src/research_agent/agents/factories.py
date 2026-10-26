@@ -23,6 +23,11 @@ def _load(name: str) -> str:
     return (PROMPTS / name).read_text(encoding="utf-8")
 
 
+def _model(settings: Settings, configured: str):
+    settings.apply_provider_env()
+    return settings.resolve_llm_model(configured)
+
+
 @dataclass
 class PlannerDeps:
     question: str
@@ -61,9 +66,8 @@ class CuratorDeps:
 
 
 def build_planner(settings: Settings) -> Agent[PlannerDeps, ResearchPlan]:
-    settings.apply_provider_env()
     return Agent(
-        settings.model_planner,
+        _model(settings, settings.model_planner),
         deps_type=PlannerDeps,
         output_type=ResearchPlan,
         instructions=_load("planner.md"),
@@ -72,9 +76,8 @@ def build_planner(settings: Settings) -> Agent[PlannerDeps, ResearchPlan]:
 
 
 def build_searcher(settings: Settings) -> Agent[SearcherDeps, SearcherOutput]:
-    settings.apply_provider_env()
     agent: Agent[SearcherDeps, SearcherOutput] = Agent(
-        settings.model_searcher,
+        _model(settings, settings.model_searcher),
         deps_type=SearcherDeps,
         output_type=SearcherOutput,
         instructions=_load("searcher.md"),
@@ -92,9 +95,8 @@ def build_searcher(settings: Settings) -> Agent[SearcherDeps, SearcherOutput]:
 
 
 def build_reader(settings: Settings) -> Agent[ReaderDeps, ReaderOutput]:
-    settings.apply_provider_env()
     agent: Agent[ReaderDeps, ReaderOutput] = Agent(
-        settings.model_reader,
+        _model(settings, settings.model_reader),
         deps_type=ReaderDeps,
         output_type=ReaderOutput,
         instructions=_load("reader.md"),
@@ -114,9 +116,8 @@ def build_reader(settings: Settings) -> Agent[ReaderDeps, ReaderOutput]:
 
 
 def build_critic(settings: Settings) -> Agent[CriticDeps, Review]:
-    settings.apply_provider_env()
     agent: Agent[CriticDeps, Review] = Agent(
-        settings.model_critic,
+        _model(settings, settings.model_critic),
         deps_type=CriticDeps,
         output_type=Review,
         instructions=_load("critic.md"),
@@ -134,9 +135,8 @@ def build_critic(settings: Settings) -> Agent[CriticDeps, Review]:
 
 
 def build_writer(settings: Settings) -> Agent[WriterDeps, Report]:
-    settings.apply_provider_env()
     agent: Agent[WriterDeps, Report] = Agent(
-        settings.model_writer,
+        _model(settings, settings.model_writer),
         deps_type=WriterDeps,
         output_type=Report,
         instructions=_load("writer.md"),
@@ -156,9 +156,8 @@ def build_writer(settings: Settings) -> Agent[WriterDeps, Report]:
 
 
 def build_curator(settings: Settings) -> Agent[CuratorDeps, CuratorOutput]:
-    settings.apply_provider_env()
     return Agent(
-        settings.model_curator,
+        _model(settings, settings.model_curator),
         deps_type=CuratorDeps,
         output_type=CuratorOutput,
         instructions=_load("curator.md"),
