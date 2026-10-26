@@ -15,29 +15,22 @@ services:
       timeout: 5s
       retries: 10
 
-  api:
+  app:
     profiles: [full]
     build:
       context: .
-      dockerfile: infra/api.Dockerfile
+      dockerfile: Dockerfile
     env_file: .env
-    ports:
-      - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
-
-  web:
-    profiles: [full]
-    build:
-      context: .
-      dockerfile: infra/web.Dockerfile
     environment:
-      API_BASE_URL: http://api:8000
+      API_BASE_URL: http://127.0.0.1:8000
+      API_INTERNAL_URL: http://127.0.0.1:8000
+      DATABASE_URL: postgresql+asyncpg://research:research@db:5432/research
+      CORS_ORIGINS: http://localhost:3000
     ports:
       - "3000:3000"
     depends_on:
-      - api
+      db:
+        condition: service_healthy
 
 volumes:
   pgdata:

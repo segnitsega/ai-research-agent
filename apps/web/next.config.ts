@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // Custom Express server (server.mjs) serves the UI in production.
 };
 
 export default nextConfig;

@@ -1,4 +1,4 @@
-# Prefer repo-root Dockerfile for Render; kept for compose/local builds.
+# Prefer repo-root Dockerfile (Express + API). Kept for API-only local builds.
 FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:0.9.26 /uv /uvx /bin/
 WORKDIR /app

@@ -1,18 +1,15 @@
-# Render: set Root Directory to apps/web (Language = Docker)
-FROM node:22-slim AS build
-WORKDIR /app
-RUN corepack enable
-COPY . .
-RUN pnpm install --frozen-lockfile && pnpm build
-
+# Prefer the repo-root Dockerfile for Render (API + UI together).
+# This file is for web-only local experiments with Root Directory = apps/web.
 FROM node:22-slim
 WORKDIR /app
-RUN useradd --create-home appuser
-COPY --from=build /app/.next/standalone ./
-COPY --from=build /app/.next/static ./.next/static
-RUN mkdir -p ./public
-USER appuser
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY . .
+RUN pnpm install --frozen-lockfile && pnpm build && pnpm prune --prod
+ENV PORT=3000 \
+    NODE_ENV=production \
+    HOSTNAME=0.0.0.0 \
+    API_BASE_URL=http://127.0.0.1:8000 \
+    API_INTERNAL_URL=http://127.0.0.1:8000
 EXPOSE 3000
-ENV PORT=3000
-ENV HOSTNAME=0.0.0.0
-CMD ["node", "server.js"]
+CMD ["node", "server.mjs"]
