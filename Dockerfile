@@ -2,9 +2,13 @@
 FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:0.9.26 /uv /uvx /bin/
 WORKDIR /app
-COPY apps/api /app
-RUN uv sync --frozen --no-dev
-RUN useradd --create-home appuser
+COPY apps/api/pyproject.toml apps/api/uv.lock apps/api/README.md ./
+COPY apps/api/src ./src
+COPY apps/api/migrations ./migrations
+COPY apps/api/alembic.ini ./
+RUN rm -rf .venv && uv sync --frozen --no-dev \
+ && useradd --create-home appuser \
+ && chown -R appuser:appuser /app
 USER appuser
 EXPOSE 8000
 ENV PORT=8000

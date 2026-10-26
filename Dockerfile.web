@@ -10,7 +10,7 @@ WORKDIR /app
 RUN useradd --create-home appuser
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
-COPY --from=build /app/public ./public
+RUN mkdir -p ./public
 USER appuser
 EXPOSE 3000
 ENV PORT=3000
