@@ -8,7 +8,8 @@ const sans = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
 
 export const metadata: Metadata = {
   title: { default: "Research Agent", template: "%s · Research Agent" },
-  description: "A reading desk for multi-agent research with Gemini",
+  description: "A reading desk for multi-agent research with cited sources",
+  applicationName: "Research Agent",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
