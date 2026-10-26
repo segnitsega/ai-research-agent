@@ -46,7 +46,7 @@ Advanced overrides exist in the UI; the server still enforces its own max ceilin
 | **Writer** | Drafts the report; citations must map to accepted findings |
 | **Curator** | Upserts memory (preferences / facts / episode summary) |
 
-Models default to **Gemini** (`google:gemini-2.5-flash`). If both Google and xAI keys are set, Gemini is tried first and **Grok** is the fallback. Only Grok? It uses Grok. Only Gemini? Gemini.
+Models default to **Gemini** (`google:gemini-3.8-flash`). If both Google and xAI keys are set, Gemini is tried first and **Grok** is the fallback. Only Grok? It uses Grok. Only Gemini? Gemini.
 
 ---
 
@@ -56,7 +56,7 @@ Models default to **Gemini** (`google:gemini-2.5-flash`). If both Google and xAI
 | --- | --- |
 | API | FastAPI · pydantic-ai · SQLAlchemy async · Postgres + **pgvector** · Alembic |
 | Web | Next.js App Router · Express in production (UI + `/v1` proxy) |
-| Search | `fake` · `duckduckgo` · `tavily` (+ arxiv helper) |
+| Search | Tavily (+ arxiv helper) |
 | Embeddings | Hash (default) or Gemini embeddings |
 | Ship | One Docker image · one Render Web Service |
 
@@ -66,9 +66,8 @@ Models default to **Gemini** (`google:gemini-2.5-flash`). If both Google and xAI
 
 ```bash
 cp .env.example .env
-# Minimum: API_KEY
-# Live LLM: GOOGLE_API_KEY and/or XAI_API_KEY, ALLOW_MODEL_REQUESTS=true
-# Live search: SEARCH_PROVIDER=tavily + TAVILY_API_KEY  (or duckduckgo / fake)
+# Required: API_KEY, GOOGLE_API_KEY (or GEMINI_API_KEY), ALLOW_MODEL_REQUESTS=true
+# Search: SEARCH_PROVIDER=tavily and TAVILY_API_KEY
 
 make setup      # uv sync + pnpm install
 make up         # Postgres+pgvector on localhost:5433
@@ -83,14 +82,6 @@ CLI from `apps/api` (DB up):
 ```bash
 uv run research-agent run "Who develops the Gemini models?" --depth quick
 ```
-
-### Search providers
-
-| `SEARCH_PROVIDER` | When to use |
-| --- | --- |
-| `fake` | Offline / CI — ships a canned Gemini page |
-| `duckduckgo` | Real results, no search API key |
-| `tavily` | Stronger retrieval; needs `TAVILY_API_KEY` |
 
 ### Useful Make targets
 
@@ -117,7 +108,7 @@ Copy `.env.example`. Highlights:
 | Web → API | `API_BASE_URL` (local: `http://localhost:8000`; Docker/Render: `http://127.0.0.1:8000`) |
 | Database | `DATABASE_URL` — `postgresql+asyncpg://…` (plain `postgresql://` is auto-rewritten; non-local hosts get `ssl=require`) |
 | Models | `MODEL_PLANNER` … `MODEL_CURATOR`, `GOOGLE_API_KEY` / `GEMINI_API_KEY`, `XAI_API_KEY`, `ALLOW_MODEL_REQUESTS` |
-| Search | `SEARCH_PROVIDER`, `TAVILY_API_KEY` |
+| Search | `SEARCH_PROVIDER=tavily`, `TAVILY_API_KEY` |
 | Budgets | `SERVER_MAX_COST_USD`, `SERVER_MAX_FETCHES`, `SERVER_MAX_ITERATIONS`, concurrency / fetch limits |
 
 Never commit real `.env` secrets.
@@ -165,7 +156,8 @@ One Web Service is enough.
 | `CORS_ORIGINS` | `https://YOUR-SERVICE.onrender.com` |
 | `GOOGLE_API_KEY` / `XAI_API_KEY` | At least one; Gemini preferred |
 | `ALLOW_MODEL_REQUESTS` | `true` |
-| `SEARCH_PROVIDER` (+ `TAVILY_API_KEY` if tavily) | Your choice |
+| `SEARCH_PROVIDER` | `tavily` |
+| `TAVILY_API_KEY` | Your Tavily key |
 
 4. Deploy. Logs should show migrations → `FastAPI is ready` → Express listening.  
 5. Open the public URL — you should see the desk, not raw JSON.
@@ -214,7 +206,6 @@ Cold starts on the free tier can take a minute after idle.
 │   ├── api.Dockerfile                # Optional API-only image
 │   └── web.Dockerfile                # Optional web-only image
 │
-├── .github/workflows/ci.yml
 ├── Dockerfile                        # Unified image (use this on Render)
 ├── Dockerfile.web                    # Same unified image (legacy path)
 ├── docker-compose.yml                # Local DB (+ optional full stack profile)
@@ -241,8 +232,6 @@ make test-int      # Needs Postgres from make up
 make eval          # Smoke evals
 make lint && make typecheck
 ```
-
-CI (`.github/workflows/ci.yml`) spins pgvector and runs the same family of checks.
 
 ---
 
