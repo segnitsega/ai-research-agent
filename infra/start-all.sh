@@ -6,16 +6,18 @@ export API_BASE_URL="${API_BASE_URL:-http://127.0.0.1:8000}"
 export NODE_ENV="${NODE_ENV:-production}"
 
 cd /app/api
+PYTHON="/app/api/.venv/bin/python"
+export PATH="/app/api/.venv/bin:$PATH"
 
 echo "running database migrations..."
-uv run python -m alembic upgrade head
+"$PYTHON" -m alembic upgrade head
 
 echo "starting FastAPI on 127.0.0.1:8000..."
-uv run python -m uvicorn research_agent.main:app --host 127.0.0.1 --port 8000 &
+"$PYTHON" -m uvicorn research_agent.main:app --host 127.0.0.1 --port 8000 &
 API_PID=$!
 
 i=0
-until python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')" 2>/dev/null; do
+until "$PYTHON" -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')" 2>/dev/null; do
   i=$((i + 1))
   if ! kill -0 "$API_PID" 2>/dev/null; then
     echo "FastAPI exited before becoming ready" >&2

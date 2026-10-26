@@ -25,6 +25,22 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://research:research@localhost:5433/research"
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value: object) -> object:
+        if not isinstance(value, str) or not value.strip():
+            return value
+        url = value.strip()
+        if url.startswith("postgres://"):
+            url = "postgresql://" + url.removeprefix("postgres://")
+        if url.startswith("postgresql://"):
+            url = "postgresql+asyncpg://" + url.removeprefix("postgresql://")
+        # Managed Postgres (e.g. Render) usually requires TLS.
+        local = "localhost" in url or "127.0.0.1" in url
+        if not local and "ssl=" not in url:
+            url = f"{url}&ssl=require" if "?" in url else f"{url}?ssl=require"
+        return url
+
     model_planner: str = DEFAULT_GEMINI_MODEL
     model_searcher: str = DEFAULT_GEMINI_MODEL
     model_reader: str = DEFAULT_GEMINI_MODEL
