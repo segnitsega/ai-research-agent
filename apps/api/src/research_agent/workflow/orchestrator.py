@@ -549,9 +549,14 @@ class RunOrchestrator:
             await self.store.update_run(user_id, record.id, state=record.state)  # type: ignore[attr-defined]
             return
         summary = record.report.executive_summary if record.report else record.question
-        tracker.check_llm_allowed()
-        curated, usage = await self.agents.curate(record.question, summary)
-        _charge(tracker, AgentName.CURATOR, usage)
+        try:
+            tracker.check_llm_allowed()
+            curated, usage = await self.agents.curate(record.question, summary)
+            _charge(tracker, AgentName.CURATOR, usage)
+        except BudgetExhaustedError:
+            mark_phase_done(record.state, Phase.MEMORIZE)
+            await self.store.update_run(user_id, record.id, state=record.state, usage=tracker.usage_snapshot())  # type: ignore[attr-defined]
+            return
         added = updated = deleted = 0
         episode = False
         if self.embedder is not None:

@@ -43,6 +43,7 @@ export function RunDesk({ id }: { id: string }) {
   const [missing, setMissing] = useState(false);
   const [tab, setTab] = useState<Tab>("report");
   const [pane, setPane] = useState<Pane>("work");
+  const [showActivity, setShowActivity] = useState(false);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [showRejected, setShowRejected] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<"all" | "fetched" | "failed">("all");
@@ -100,7 +101,10 @@ export function RunDesk({ id }: { id: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const terminal = state.status === "completed" || state.status === "failed" || state.status === "cancelled";
+  const softFailed = state.status === "failed" && Boolean(state.report);
+  const displayStatus = softFailed ? "completed" : state.status;
+  const showHardFailure = state.status === "failed" && !state.report;
+  const terminal = displayStatus === "completed" || displayStatus === "failed" || displayStatus === "cancelled";
   const accepted = state.findings.filter((item) => item.status !== "rejected");
   const rejected = state.findings.filter((item) => item.status === "rejected");
   const citation = selection?.kind === "citation" ? state.report?.citations.find((item) => item.n === selection.n) ?? null : null;
@@ -160,7 +164,7 @@ export function RunDesk({ id }: { id: string }) {
           <p className="kicker">{state.depth || "Research"} run</p>
           <h1 className="mt-2 font-display text-3xl leading-tight sm:text-4xl">{state.question || "Opening the run…"}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <StatusBadge status={state.status} />
+            <StatusBadge status={displayStatus} />
             <span className="text-sm text-muted">{formatMoney(state.usage?.costUsd ?? 0)}</span>
             <span className="text-sm text-muted">{accepted.length} findings</span>
             <span className="text-sm text-muted">{state.sources.length} sources</span>
@@ -190,9 +194,9 @@ export function RunDesk({ id }: { id: string }) {
         </div>
       </header>
 
-      {state.error ? (
+      {showHardFailure ? (
         <div className="mt-4 rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger" role="alert">
-          <p>{state.error}</p>
+          <p>{state.error || "The research run failed."}</p>
           <Link className="mt-2 inline-flex min-h-11 items-center font-semibold" href={`/?question=${encodeURIComponent(state.question)}`}>
             Retry as a new run
           </Link>
@@ -213,28 +217,41 @@ export function RunDesk({ id }: { id: string }) {
         </div>
       </div>
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-[17rem_minmax(0,1fr)_20rem]">
-        <div className={cn(pane === "activity" ? "block" : "hidden", "xl:block")}>
+      <div className={cn("mt-5 grid gap-5", showActivity ? "xl:grid-cols-[17rem_minmax(0,1fr)_20rem]" : "xl:grid-cols-[minmax(0,1fr)_20rem]")}>
+        <div className={cn(pane === "activity" ? "block" : "hidden", showActivity ? "xl:block" : "xl:hidden")}>
           <ActivityTimeline events={state.events} />
         </div>
         <section className={cn(pane === "work" ? "block" : "hidden", "min-w-0 xl:block")} aria-label="Research work">
-          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Research sections">
-            {(
-              [
-                ["report", "Report"],
-                ["plan", "Plan"],
-                ["sources", "Sources"],
-                ["findings", "Findings"],
-              ] as const
-            ).map(([item, label]) => (
-              <button key={item} type="button" role="tab" aria-selected={tab === item} className={cn("min-h-11 rounded-full px-4 text-sm font-semibold", tab === item ? "bg-accent text-accent-ink" : "bg-raised text-muted")} onClick={() => setTab(item)}>
-                {label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="hidden min-h-11 items-center gap-1.5 px-1 text-sm font-semibold text-muted transition hover:text-ink xl:inline-flex"
+              aria-expanded={showActivity}
+              onClick={() => setShowActivity((value) => !value)}
+            >
+              Activity
+              <svg viewBox="0 0 16 16" className={cn("h-3.5 w-3.5 transition-transform", showActivity && "rotate-180")} aria-hidden>
+                <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <div className="flex flex-wrap gap-2" role="tablist" aria-label="Research sections">
+              {(
+                [
+                  ["report", "Report"],
+                  ["plan", "Plan"],
+                  ["sources", "Sources"],
+                  ["findings", "Findings"],
+                ] as const
+              ).map(([item, label]) => (
+                <button key={item} type="button" role="tab" aria-selected={tab === item} className={cn("min-h-11 rounded-full px-4 text-sm font-semibold", tab === item ? "bg-accent text-accent-ink" : "bg-raised text-muted")} onClick={() => setTab(item)}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="mt-4">
             {tab === "report" ? (
-              <ReportPane statePhase={state.phase} status={state.status} report={state.report} iteration={state.iteration} sources={state.sources.length} findings={accepted.length} onCite={chooseCitation} />
+              <ReportPane statePhase={state.phase} status={displayStatus} report={state.report} iteration={state.iteration} sources={state.sources.length} findings={accepted.length} onCite={chooseCitation} />
             ) : null}
             {tab === "plan" ? <PlanPane plan={state.plan} coverage={state.review?.coverage ?? {}} verdict={state.review?.verdict ?? ""} rationale={state.review?.rationale ?? ""} /> : null}
             {tab === "sources" ? (

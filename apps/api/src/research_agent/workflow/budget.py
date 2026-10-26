@@ -66,27 +66,8 @@ class BudgetTracker:
         self.iterations_used += 1
 
     def check_llm_allowed(self) -> None:
-        self._check_limits(exclude_iterations=True)
-
-    def check_fetch_allowed(self) -> None:
-        if self.exhausted:
-            raise BudgetExhaustedError(self.exhausted)
-        if self.fetches >= self.budget.max_fetches:
-            self.exhausted = "fetches"
-            raise BudgetExhaustedError("fetches")
-        self._maybe_warn("fetches", self.fetches, self.budget.max_fetches)
-
-    def check_iteration_allowed(self) -> bool:
-        if self.iterations_used >= self.budget.max_iterations:
-            self.exhausted = "iterations"
-            return False
-        return True
-
-    def should_write_only(self) -> bool:
-        return self.exhausted is not None
-
-    def _check_limits(self, *, exclude_iterations: bool) -> None:
-        if self.exhausted:
+        # Fetch/iteration exhaustion must not block later write/memorize LLM calls.
+        if self.exhausted in {"cost", "tokens", "time"}:
             raise BudgetExhaustedError(self.exhausted)
         if self.cost_usd >= self.budget.max_cost_usd:
             self.exhausted = "cost"
@@ -98,12 +79,26 @@ class BudgetTracker:
         if self.elapsed_seconds() >= self.budget.max_wall_seconds:
             self.exhausted = "time"
             raise BudgetExhaustedError("time")
-        if not exclude_iterations and self.iterations_used >= self.budget.max_iterations:
-            self.exhausted = "iterations"
-            raise BudgetExhaustedError("iterations")
         self._maybe_warn("cost", self.cost_usd, self.budget.max_cost_usd)
         self._maybe_warn("tokens", float(total_tokens), float(self.budget.max_tokens))
         self._maybe_warn("time", self.elapsed_seconds(), float(self.budget.max_wall_seconds))
+
+    def check_fetch_allowed(self) -> None:
+        if self.exhausted == "fetches" or self.fetches >= self.budget.max_fetches:
+            self.exhausted = "fetches"
+            raise BudgetExhaustedError("fetches")
+        if self.exhausted in {"cost", "tokens", "time"}:
+            raise BudgetExhaustedError(self.exhausted)
+        self._maybe_warn("fetches", self.fetches, self.budget.max_fetches)
+
+    def check_iteration_allowed(self) -> bool:
+        if self.iterations_used >= self.budget.max_iterations:
+            self.exhausted = "iterations"
+            return False
+        return True
+
+    def should_write_only(self) -> bool:
+        return self.exhausted is not None
 
     def _maybe_warn(self, resource: ResourceKind, used: float, limit: float) -> None:
         if resource in self.warned:
