@@ -83,7 +83,10 @@ function formatValidationErrors(errors: unknown): string {
     .map((item) => {
       if (!item || typeof item !== "object") return "";
       const msg = "msg" in item && typeof item.msg === "string" ? item.msg : "";
-      const loc = "loc" in item && Array.isArray(item.loc) ? item.loc.filter((part) => part !== "body").join(".") : "";
+      const loc =
+        "loc" in item && Array.isArray(item.loc)
+          ? item.loc.filter((part: unknown) => part !== "body").join(".")
+          : "";
       if (msg && loc) return `${loc}: ${msg}`;
       return msg;
     })
