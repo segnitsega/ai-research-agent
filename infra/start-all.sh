@@ -8,6 +8,8 @@ export NODE_ENV="${NODE_ENV:-production}"
 cd /app/api
 PYTHON="/app/api/.venv/bin/python"
 export PATH="/app/api/.venv/bin:$PATH"
+# Belt-and-suspenders if the package install is path-sensitive.
+export PYTHONPATH="/app/api/src${PYTHONPATH:+:$PYTHONPATH}"
 
 echo "running database migrations..."
 "$PYTHON" -m alembic upgrade head

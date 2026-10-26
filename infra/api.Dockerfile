@@ -6,7 +6,7 @@ COPY apps/api/pyproject.toml apps/api/uv.lock apps/api/README.md ./
 COPY apps/api/src ./src
 COPY apps/api/migrations ./migrations
 COPY apps/api/alembic.ini ./
-RUN rm -rf .venv && uv sync --frozen --no-dev \
+RUN rm -rf .venv && uv sync --frozen --no-dev --no-editable \
  && useradd --create-home appuser \
  && chown -R appuser:appuser /app
 USER appuser

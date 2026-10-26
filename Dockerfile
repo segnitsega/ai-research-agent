@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Single Render Web Service: Express serves Next.js and proxies /v1 to FastAPI in-process.
 FROM ghcr.io/astral-sh/uv:0.9.26 AS uv
 
@@ -8,7 +9,10 @@ COPY apps/api/pyproject.toml apps/api/uv.lock apps/api/README.md ./
 COPY apps/api/src ./src
 COPY apps/api/migrations ./migrations
 COPY apps/api/alembic.ini ./
-RUN uv sync --frozen --no-dev
+# Non-editable so the package survives COPY into /app/api in the final image.
+# Generous HTTP timeout so slow/cold registry mirrors don't fail the build.
+ENV UV_HTTP_TIMEOUT=180
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev --no-editable
 
 FROM node:22-bookworm-slim AS web-build
 WORKDIR /web
