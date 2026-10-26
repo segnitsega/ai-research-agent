@@ -41,9 +41,20 @@ describe("reduce", () => {
       type: "run.failed",
       data: { message: "status_code: 404, model_name: gemini-2.5-flash, body: {'error': {'code': 404}}" },
     });
-    expect(state.error).toBe("The research run failed.");
-    expect(eventSummary(state.events[0])).toBe("The research run failed.");
+    expect(state.error).toBe("The configured model was not found. Check the MODEL_* settings on the API service.");
+    expect(eventSummary(state.events[0])).toBe(state.error);
     expect(JSON.stringify(state)).not.toContain("gemini-2.5-flash");
+  });
+
+  it("keeps a sanitized run failure message", () => {
+    const message = "The xAI/Grok API key is missing, invalid, or expired. Check XAI_API_KEY on the API service.";
+    const state = reduce(emptyRunState(), {
+      seq: 1,
+      type: "run.failed",
+      data: { message },
+    });
+    expect(state.error).toBe(message);
+    expect(eventSummary(state.events[0])).toBe(message);
   });
 
   it("describes a search in one line", () => {

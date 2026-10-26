@@ -1,3 +1,4 @@
+import { publicRunError } from "@/lib/api-error";
 import { clip, domainOf } from "@/lib/format";
 
 export type RunEvent = {
@@ -369,7 +370,7 @@ export function eventSummary(event: RunEvent): string {
     case "run.completed":
       return "Run completed";
     case "run.failed":
-      return "The research run failed.";
+      return publicRunError(text(data.message) || text(data.error));
     case "run.cancelled":
       return "Run cancelled";
     default:
@@ -488,9 +489,10 @@ export function reduce(state: RunState, event: RunEvent): RunState {
   if (event.type === "budget.exhausted") next.exhausted = text(data.resource) || "budget";
   if (event.type === "run.completed") next.status = "completed";
   if (event.type === "run.failed") {
+    const message = publicRunError(text(data.message) || text(data.error));
     next.status = "failed";
-    next.error = "The research run failed.";
-    next.events = [...state.events, { ...event, data: {} }];
+    next.error = message;
+    next.events = [...state.events, { ...event, data: { message } }];
   }
   if (event.type === "run.cancelled") next.status = "cancelled";
   return next;
@@ -522,6 +524,6 @@ export function mergeDetail(state: RunState, detail: RunDetailSeed): RunState {
     report: state.report ?? parseReport(detail.report),
     usage: state.usage ?? parseUsage(detail.usage),
     budget: state.budget ?? parseBudget(detail.budget),
-    error: state.error ?? (detail.error ? "The research run failed." : null),
+    error: state.error ?? (detail.error ? publicRunError(detail.error) : null),
   };
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { readApiError } from "@/lib/api-error";
 import { cn, formatWhen } from "@/lib/format";
 
 type MemoryItem = {
@@ -68,8 +69,7 @@ export function MemoryDesk() {
       body: JSON.stringify({ kind, content: content.trim(), importance }),
     });
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-      setError(body?.detail || "That memory could not be saved.");
+      setError(await readApiError(response, "That memory could not be saved."));
       return;
     }
     setContent("");

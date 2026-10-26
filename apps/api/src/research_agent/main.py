@@ -55,7 +55,10 @@ def create_app(
 
     @app.exception_handler(_AuthError)
     async def auth_error(_request: Request, _exc: _AuthError) -> object:
-        return problem(401, "Unauthorized")
+        return problem(
+            401,
+            "API key missing or incorrect. Set the same API_KEY on both the web and API services.",
+        )
 
     @app.exception_handler(_Missing)
     async def missing(_request: Request, _exc: _Missing) -> object:
@@ -71,7 +74,10 @@ def create_app(
 
     @app.exception_handler(_LimitError)
     async def limited(_request: Request, _exc: _LimitError) -> object:
-        return problem(429, "Rate limit exceeded")
+        return problem(
+            429,
+            "Too many runs started recently, or another run is already active. Wait and try again.",
+        )
 
     @app.middleware("http")
     async def request_guard(request: Request, call_next: object) -> object:

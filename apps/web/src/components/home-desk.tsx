@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useState, useSyncExternalStore } from "react";
 import { StatusBadge } from "@/components/status-badge";
 import { ThemeButton } from "@/components/shell";
+import { readApiError } from "@/lib/api-error";
 import { cn, formatDuration, formatMoney, formatWhen } from "@/lib/format";
 import { defaultPrefs, readPrefs, subscribePrefs, type DepthChoice } from "@/lib/prefs";
 
@@ -123,24 +124,28 @@ export function HomeDesk() {
       }
     }
     setPending(true);
-    const response = await fetch("/api/runs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        question: question.trim(),
-        depth: chosen,
-        use_memory: useMemory,
-        ...(Object.keys(overrides).length > 0 ? { budget: overrides } : {}),
-      }),
-    });
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-      setError(body?.detail || "The run could not be started.");
+    try {
+      const response = await fetch("/api/runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: question.trim(),
+          depth: chosen,
+          use_memory: useMemory,
+          ...(Object.keys(overrides).length > 0 ? { budget: overrides } : {}),
+        }),
+      });
+      if (!response.ok) {
+        setError(await readApiError(response, "The run could not be started."));
+        return;
+      }
+      const created = (await response.json()) as { id: string };
+      router.push(`/runs/${created.id}`);
+    } catch {
+      setError("Could not reach the app server. Check your connection and try again.");
+    } finally {
       setPending(false);
-      return;
     }
-    const created = (await response.json()) as { id: string };
-    router.push(`/runs/${created.id}`);
   }
 
   return (

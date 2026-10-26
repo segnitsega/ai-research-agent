@@ -27,6 +27,7 @@ from research_agent.schemas.run_state import FindingView, MemoryContext, RunStat
 from research_agent.tools.extract import chunk_text, extract_document
 from research_agent.tools.fetch import FetchFailed, FetchResult, GuardedFetcher
 from research_agent.workflow.budget import BudgetExhaustedError, BudgetTracker
+from research_agent.workflow.errors import describe_run_failure
 from research_agent.workflow.event_bus import InProcessEventBus
 from research_agent.workflow.registry import RunRegistry
 from research_agent.workflow.state import mark_phase_done
@@ -134,13 +135,14 @@ class RunOrchestrator:
                 "run.cancelled",
                 {"type": "run.cancelled", "phase": record.phase or Phase.PLAN.value},
             )
-        except Exception:
+        except Exception as exc:
             logger.exception("research run failed")
+            message = describe_run_failure(exc)
             await self.store.update_run(  # type: ignore[attr-defined]
                 user_id,
                 run_id,
                 status="failed",
-                error="The research run failed.",
+                error=message,
                 finished_at=datetime.now(UTC),
                 state=record.state,
             )
@@ -148,7 +150,7 @@ class RunOrchestrator:
                 user_id,
                 run_id,
                 "run.failed",
-                {"type": "run.failed", "error_code": "run_failed", "message": "The research run failed."},
+                {"type": "run.failed", "error_code": "run_failed", "message": message},
             )
         finally:
             await self.bus.close(run_id)
