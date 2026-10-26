@@ -8,10 +8,10 @@ export NODE_ENV="${NODE_ENV:-production}"
 cd /app/api
 
 echo "running database migrations..."
-uv run alembic upgrade head
+uv run python -m alembic upgrade head
 
 echo "starting FastAPI on 127.0.0.1:8000..."
-uv run uvicorn research_agent.main:app --host 127.0.0.1 --port 8000 &
+uv run python -m uvicorn research_agent.main:app --host 127.0.0.1 --port 8000 &
 API_PID=$!
 
 i=0
